@@ -1,0 +1,40 @@
+  name: Build ConKeyboard Installer
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:   # manual "Run workflow" button
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish single-file exe
+        run: >
+          dotnet publish src/ConKeyboard/ConKeyboard.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true
+          -o publish
+
+      - name: Compile Inno Setup installer
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc installer\installer.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Upload Setup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ConKeyboard-Setup
+          path: installer/Output/*.exe
